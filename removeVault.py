@@ -8,19 +8,30 @@ import time
 import os
 import logging
 import boto.glacier
+import gc
 from multiprocessing import Process
 from socket import gethostbyname, gaierror
 
 def split_list(alist, wanted_parts=1):
 	length = len(alist)
-	return [ alist[i*length // wanted_parts: (i+1)*length // wanted_parts] 
+	return [ alist[i*length // wanted_parts: (i+1)*length // wanted_parts]
 		for i in range(wanted_parts) ]
 
 def process_archive(archive_list):
-	logging.info('Starting work on %s items', len(archive_list))
-	for index, archive in enumerate(archive_list):
+	index = 0
+	total = len(archive_list)
+
+	logging.info('Starting work on %s items', total)
+
+	while(len(archive_list) >= 0):
+		archive = archive_list.pop()
+
+		if index % 100 == 0:
+			gc.collect()
+
 		if archive['ArchiveId'] != '':
-			logging.info('%s Remove archive number %s of %s, ID : %s', os.getpid(), index, len(archive_list), archive['ArchiveId'])
+			logging.info('%s Remove archive number %s of %s, ID : %s', os.getpid(), index, total, archive['ArchiveId'])
+
 			try:
 				vault.delete_archive(archive['ArchiveId'])
 			except:
@@ -35,6 +46,9 @@ def process_archive(archive_list):
 					logging.info('Successfully removed archive ID : %s', archive['ArchiveId'])
 				except:
 					logging.error('Cannot remove archive ID : %s', archive['ArchiveId'])
+
+		index += 1
+		del archive
 
 def printException():
 	exc_type, exc_value = sys.exc_info()[:2]
@@ -148,6 +162,10 @@ if job.status_code == 'Succeeded':
 		p = Process(target=process_archive, args=(archive,))
 		jobs.append(p)
 		p.start()
+		del archive
+
+	del inventory,archiveList,archiveParts
+	gc.collect();
 
 	for j in jobs:
 		j.join()
