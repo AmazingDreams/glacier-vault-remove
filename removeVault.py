@@ -23,7 +23,7 @@ def process_archive(archive_list):
 
 	logging.info('Starting work on %s items', total)
 
-	while(len(archive_list) >= 0):
+	while(len(archive_list) > 0):
 		archive = archive_list.pop()
 
 		if index % 100 == 0:
